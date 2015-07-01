@@ -22,7 +22,7 @@ class TurnsRKD(object):
     def set_debug(self, value=True):
         self.debug = value
 
-    def set_debug_config(self):
+    def set_debug_params(self):
         debug_params = {'NSTEPS': 2, 'NREST': 1, 'NPNORM': 1, 'DT': 0.2}
         self.set_inputs_params(debug_params)
 
