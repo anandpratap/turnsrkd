@@ -5,6 +5,9 @@
 - Make sure that the directory is added to the PYTHONPATH
 - Set the OVERTURNS2D and ADOVERTURN2D environment variables to the path of the corresponding executable
 
+
+Sample code:
+
 ```
 import os
 from turnsrkd import driver, visualizer
@@ -34,3 +37,13 @@ visturns.plot_cf()
 visturns.plot_res()
 visturns.show()
 ```
+
+## Available functions
+    
+    - set_debug_params(self) : set number of runs to minimum and print frequency to one.
+    
+    - set_inputs_params(self, params_dict) : set input parameters using a dict 
+        
+    - set_input_param(self, key, value) : set inputs parameter using key and a value
+        
+    - set_configfile_name(self, filename) : set input file name, default to 'unsteady'
