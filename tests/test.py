@@ -1,5 +1,5 @@
 import os
-from turns_driver import driver, visualizer
+from turnsrkd import driver, visualizer
 
 run_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'basic')
 
