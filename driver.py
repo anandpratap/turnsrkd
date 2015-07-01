@@ -7,14 +7,10 @@ SUCCESS = 0
 
 
 class TurnsRKD(object):
-    def __init__(self):
+    def __init__(self, rundir=tempf.mkdtemp(prefix='turns_')):
         self.executable_path = os.environ['OVERTURNS2D']
         self.configfile_name = 'unsteady'
         self.logfile_name = 'stdout.log'
-        self.rundir = '/tmp/TurnsRKD_test'
-        pass
-
-    def set_rundir(self, rundir=tempf.mkdtemp(prefix='turns_')):
         self.rundir = rundir
         os.chdir(self.rundir)
         pass
@@ -100,8 +96,8 @@ class TurnsRKD(object):
 
 
 class AdTurnsRKD(TurnsRKD):
-    def __init__(self):
-        TurnsRKD.__init__(self)
+    def __init__(self, rundir=tempf.mkdtemp(prefix='turns_')):
+        TurnsRKD.__init__(self, rundir)
         self.executable_path = os.environ['ADOVERTURNS2D']
 
     def print_startinfo(self):
