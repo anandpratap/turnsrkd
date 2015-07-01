@@ -9,7 +9,7 @@ SUCCESS = 0
 class TurnsRKD(object):
     def __init__(self, rundir=tempf.mkdtemp(prefix='turns_')):
         self.executable_path = os.environ['OVERTURNS2D']
-        self.configfile_name = 'unsteady'
+        self.inputfile_name = 'unsteady'
         self.logfile_name = 'stdout.log'
         self.rundir = rundir
         os.chdir(self.rundir)
@@ -31,11 +31,11 @@ class TurnsRKD(object):
 
     def set_input_param(self, key, value):
         print 'Setting %s to %s....' % (key, str(value)),
-        with open(self.configfile_name, 'r') as f:
+        with open(self.inputfile_name, 'r') as f:
             lines = f.read()
         pattern = "(?i)" + key + '\s*=\s*\d*\.*\d*,'
         lines = re.sub(pattern, "%s = %s," % (key.upper(), str(value)), lines)
-        f = open(self.configfile_name, 'w')
+        f = open(self.inputfile_name, 'w')
         f.write(lines)
         f.close()
         print 'Done!'
@@ -44,8 +44,8 @@ class TurnsRKD(object):
     def set_executable_path(self):
         pass
 
-    def set_configfile_name(self, filename):
-        self.configfile_name = filename
+    def set_inputfile_name(self, filename):
+        self.inputfile_name = filename
 
     def set_log_level(self):
         pass
@@ -61,7 +61,7 @@ class TurnsRKD(object):
 
     def run(self):
         self.print_startinfo()
-        sp.call('%s < %s  > %s' % (self.executable_path, self.configfile_name, self.logfile_name), shell=True)
+        sp.call('%s < %s  > %s' % (self.executable_path, self.inputfile_name, self.logfile_name), shell=True)
         self.print_endinfo()
         return SUCCESS
 
@@ -75,7 +75,7 @@ class TurnsRKD(object):
         print bcolors.ENDC
 
     def print_params(self):
-        with open(self.configfile_name, 'r') as f:
+        with open(self.inputfile_name, 'r') as f:
             for line in f:
                 for key in ['IREAD', 'NSTEPS', 'NREST', 'NPNORM', 'DT', 'ALFA', 'FSMACH', 'ITURB']:
                     pattern = "(?i)" + key + '\s*=\s*\d*\.*\d*,'
