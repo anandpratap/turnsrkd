@@ -122,6 +122,11 @@ class TurnsRKD(object):
         nj, nk = self.get_grid_dimensions()
         prod = futils.read_production(nj, nk)
         return prod
+    
+    def get_destruction(self):
+        nj, nk = self.get_grid_dimensions()
+        dest = futils.read_destruction(nj, nk)
+        return dest
 
     def write_beta(self, beta, filename):
         [nj, nk] = np.shape(beta)
@@ -183,6 +188,14 @@ class SensTurnsRKD(AdTurnsRKD):
         sens = -prod*psi_sa
         print "Sum of sensitivity: ", sum(sum(sens))
         return sens
+
+    def get_gamma_sensitivity(self):
+        dest = self.get_destruction()
+        psi_sa = self.get_saadjoint()
+        sens = -prod*psi_sa
+        print "Sum of sensitivity: ", sum(sum(sens))
+        return sens
+
 
 if __name__ == "__main__":
     # test using naca 4412 test case 

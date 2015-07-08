@@ -65,3 +65,17 @@ subroutine read_production(nj,nk,prod)
   read(111) ((prod(i,j), i=1,nj), j=1,nk)
   close(111)
 end subroutine read_production
+
+
+subroutine read_destruction(nj,nk,prod)
+  implicit none
+  integer, intent(in) :: nj, nk
+  real(kind=8), dimension(nj,nk), intent(out) :: prod
+
+  integer :: i, j
+
+  open(unit=111, form='unformatted', file='destruction.dat')
+  read(111) i, j
+  read(111) ((prod(i,j), i=1,nj), j=1,nk)
+  close(111)
+end subroutine read_destruction
