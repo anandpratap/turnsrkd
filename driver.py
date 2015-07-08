@@ -3,6 +3,7 @@ import subprocess as sp
 import os
 import re
 from utils import bcolors
+import numpy as np
 import fortutils as futils
 
 SUCCESS = 0
@@ -22,9 +23,9 @@ class TurnsRKD(object):
 
     def set_debug_params(self):
         debug_params = {'NSTEPS': 2, 'NREST': 1, 'NPNORM': 1, 'DT': 0.2}
-        self.set_inputs_params(debug_params)
+        self.set_input_params(debug_params)
 
-    def set_inputs_params(self, params_dict):
+    def set_input_params(self, params_dict):
         if not isinstance(params_dict, dict):
             raise ValueError('A dict should be supplied to the set_inputs_params function')
 
@@ -79,7 +80,7 @@ class TurnsRKD(object):
     def print_params(self):
         with open(self.inputfile_name, 'r') as f:
             for line in f:
-                for key in ['IREAD', 'NSTEPS', 'NREST', 'NPNORM', 'DT', 'ALFA', 'FSMACH', 'ITURB']:
+                for key in ['IREAD', 'NSTEPS', 'NREST', 'NPNORM', 'DT', 'ALFA', 'FSMACH', 'REY', 'ITURB']:
                     pattern = "(?i)" + key + '\s*=\s*\d*\.*\d*,'
                     str_ = re.findall(pattern, line)
                     if str_:
@@ -133,7 +134,7 @@ class TurnsRKD(object):
 
     def read_beta(self, filename):
         tb = np.loadtxt(filename)
-        nj, nk = tu.get_dimensions()
+        nj, nk = futils.get_grid_dimensions()
         beta = np.zeros([nj, nk])
         counter = 0
         for k in range(nk):
