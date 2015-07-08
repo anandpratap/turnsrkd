@@ -3,6 +3,8 @@ import subprocess as sp
 import os
 import re
 from utils import bcolors
+import fortutils as futils
+
 SUCCESS = 0
 
 
@@ -95,6 +97,52 @@ class TurnsRKD(object):
         print bcolors.ENDC
 
 
+
+    def get_grid_dimensions(self):
+        nj, nk = futils.get_grid_dimensions()
+        return nj, nk
+
+    def get_grid(self):
+        nj, nk = self.get_grid_dimensions()
+        x, y = futils.read_grid(nj, nk)
+        return x, y
+
+    def get_velocity(self):
+        nj, nk = self.get_grid_dimensions()
+        x, y, u, v, uv = futils.read_reystress(nj, nk)
+        return u, v
+
+    def get_reystress(self):
+        nj, nk = self.get_grid_dimensions()
+        x, y, u, v, uv = futils.read_reystress(nj, nk)
+        return uv
+
+    def get_production(self):
+        nj, nk = self.get_grid_dimensions()
+        prod = futils.read_production(nj, nk)
+        return prod
+
+    def write_beta(self, beta, filename):
+        [nj, nk] = np.shape(beta)
+        f = open(filename, "w")
+        for k in range(nk):
+            for j in range(nj):
+                f.write("%2.16f\n"%beta[j][k])
+        f.close()
+        print "Wrote beta to file!"
+
+    def read_beta(self, filename):
+        tb = np.loadtxt(filename)
+        nj, nk = tu.get_dimensions()
+        beta = np.zeros([nj, nk])
+        counter = 0
+        for k in range(nk):
+            for j in range(nj):
+                beta[j][k] = tb[counter]
+                counter  = counter + 1
+        return beta
+
+
 class AdTurnsRKD(TurnsRKD):
     def __init__(self, rundir=tempf.mkdtemp(prefix='turns_')):
         TurnsRKD.__init__(self, rundir)
@@ -117,3 +165,29 @@ class AdTurnsRKD(TurnsRKD):
         print '## Convergence:'
         sp.call('tail -n 1 fort.171', shell=True)
         print bcolors.ENDC
+
+    def get_saadjoint(self):
+        nj, nk = self.get_grid_dimensions()
+        psi_sa = futils.read_saadjoint(nj, nk)
+        return psi_sa
+
+class SensTurnsRKD(AdTurnsRKD):
+    def __init__(self, rundir):
+        AdTurnsRKD.__init__(self, rundir)
+               
+
+    def get_beta_sensitivity(self):
+        prod = self.get_production()
+        psi_sa = self.get_saadjoint()
+        sens = -prod*psi_sa
+        print "Sum of sensitivity: ", sum(sum(sens))
+        return sens
+
+if __name__ == "__main__":
+    # test using naca 4412 test case 
+    from pylab import *
+    sensturns = SensTurnsRKD(rundir="/home/anandps/Dropbox/research/summer_2015/naca_4412/beta_adjoint_test_225_65")
+    sens = sensturns.get_beta_sensitivity()
+    x, y = sensturns.get_grid()
+    contourf(x, y, sens)
+    show()
