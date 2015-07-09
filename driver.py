@@ -128,6 +128,18 @@ class TurnsRKD(object):
         dest = futils.read_destruction(nj, nk)
         return dest
 
+    def get_cp(self):
+        data = np.loadtxt("cp.dat")
+        x = data[:,0]
+        cp = data[:,1]
+        return x, cp
+
+    def get_cp_benchmark(self):
+        data = np.loadtxt("cp_benchmark.dat")
+        x = data[:,0]
+        cp = data[:,2]
+        return x, cp
+
     def write_beta(self, beta, filename):
         [nj, nk] = np.shape(beta)
         f = open(filename, "w")
@@ -192,7 +204,7 @@ class SensTurnsRKD(AdTurnsRKD):
     def get_gamma_sensitivity(self):
         dest = self.get_destruction()
         psi_sa = self.get_saadjoint()
-        sens = -prod*psi_sa
+        sens = -dest*psi_sa
         print "Sum of sensitivity: ", sum(sum(sens))
         return sens
 
