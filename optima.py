@@ -4,9 +4,14 @@ import shutil
 import subprocess as sp
 import numpy as np
 from numpy.linalg import norm
+import scipy.sparse.linalg as slinalg
+from multiprocessing import Pool
+from itertools import repeat, izip
+
+
 
 from driver import TurnsRKD, AdTurnsRKD, SensTurnsRKD
-
+from template import POINTWISE_OBJINP
 BASE_DIR_NFILES = 6
 BASE_DIR_NAME = "base_dir"
 
@@ -52,8 +57,8 @@ class Optima(object):
 
     def update(self, beta, sens):
         if self.step_type == 'sd':
-            stepsize = self.base_stepsize/abs(sens).max()
-            beta = beta - sens*stepsize
+            stepsize = self.base_stepsize
+            beta = beta - sens/abs(sens).max()*stepsize
             print "Updated beta using steepest descent!"
         else:
             raise ValueError("Step type not defined!")
@@ -74,30 +79,71 @@ class Optima(object):
             turns.set_input_params(self.solver_params)
             
         turns.run()
-        
-        current_adjoint_rundir = os.path.join(current_rundir, "adjoint_0")
-        os.mkdir(current_adjoint_rundir)
-        for f in self.adjoint_copytree:
-            cmd = 'cp ' + os.path.join(current_rundir, f) +' '+ current_adjoint_rundir + '/.'
-            sp.call(cmd, shell=True)
+ 
+        if self.step_type == 'sd':
+            current_adjoint_rundir = os.path.join(current_rundir, "adjoint_0")
+            os.mkdir(current_adjoint_rundir)
+            for f in self.adjoint_copytree:
+                cmd = 'cp ' + os.path.join(current_rundir, f) +' '+ current_adjoint_rundir + '/.'
+                sp.call(cmd, shell=True)
 
-        adturns = AdTurnsRKD(rundir = current_adjoint_rundir)
-        if self.DEBUG:
-            adturns.set_debug_params()
-        else:
-            adturns.set_input_params(self.adjoint_params)
+            adturns = AdTurnsRKD(rundir = current_adjoint_rundir)
+            if self.DEBUG:
+                adturns.set_debug_params()
+            else:
+                adturns.set_input_params(self.adjoint_params)
             
-        adturns.run()
-        sensturns = SensTurnsRKD(rundir = current_adjoint_rundir)
-        sens = sensturns.get_beta_sensitivity()
-        beta = sensturns.read_beta("beta.opt")
-        beta = self.update(beta, sens)
+            adturns.run()
+            sensturns = SensTurnsRKD(rundir = current_adjoint_rundir)
+            sens = sensturns.get_beta_sensitivity()
+            beta = sensturns.read_beta("beta.opt")
+            beta = self.update(beta, sens)
+        elif self.step_type == 'gn':
+            # Gauss Newton
+            points = self.points
+            npoints = len(self.points)
+            for p in points:
+                current_adjoint_rundir = os.path.join(current_rundir, "adjoint_%i"%p)
+                os.mkdir(current_adjoint_rundir)
+                for f in self.adjoint_copytree:
+                    cmd = 'cp ' + os.path.join(current_rundir, f) +' '+ current_adjoint_rundir + '/.'
+                    sp.call(cmd, shell=True)
+                os.chdir(current_adjoint_rundir)
+                # change the obj_inp
+                os.chdir("../")
+            # pool and run the adjoints
+            pool = Pool(npoints)
+            pool.map(run_pointwise_adjoint, izip(points, repeat(current_rundir), repeat(self.adjoint_params), repeat(self.DEBUG)))
+            # build jac
+            nj, nk = turns.get_grid_dimensions()
+            nt = nj*nk
+            jac = np.zeros([npoints, nt])
+            F = np.zeros([npoints,1])
+            for pidx, p in enumerate(points):
+                current_adjoint_rundir = os.path.join(current_rundir, "adjoint_%i"%p)
+                sensturns = SensTurnsRKD(rundir = current_adjoint_rundir)
+                sens = sensturns.get_beta_sensitivity()
+                jac[pidx, :] = np.reshape(sens, [1, nt])
+                F[pidx] = np.loadtxt("fort.747")
+
+            lam = self.lam
+            beta = sensturns.read_beta("beta.opt")
+            dbeta = slinalg.cg(jac.T.dot(jac) + lam*np.eye(nt), -jac.T.dot(F))
+            beta = beta + np.reshape(dbeta[0], [nj, nk])
+        else:
+            raise ValueError("Step type not defined!")
+            
+        
         sensturns.write_beta(beta, os.path.join(self.base_dir, "beta.opt"))
         print "Updated beta in the base directory!!"
         self.iteration_number += 1
-        self.objf = np.loadtxt("fort.747")[-1]
+        try:
+            self.objf = np.loadtxt("fort.747")[-1]
+        except:
+            self.objf = np.loadtxt("fort.747")
         self.sens_norm = norm(sens)
 
+        
     def run(self):
         for i in range(self.maxstep):
             print "Starting iteration ", self.iteration_number
@@ -114,4 +160,23 @@ class Optima(object):
 
 if __name__ == "__main__":
     pass
+
+DEBUG = True
+def run_pointwise_adjoint((p, current_rundir, adjoint_params, debug)):
+    current_adjoint_rundir = os.path.join(current_rundir, "adjoint_%i"%p)
+    adturns = AdTurnsRKD(rundir = current_adjoint_rundir)
+    
+    # setup obj.inp
+    f = open("obj.inp", "w")
+    f.write(POINTWISE_OBJINP%p)
+    f.close()
+
+    if debug:
+        adturns.set_debug_params()
+    else:
+        adturns.set_input_params(adjoint_params)
+    adturns.run()
+
+
+
 
