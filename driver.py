@@ -10,11 +10,12 @@ SUCCESS = 0
 
 
 class TurnsRKD(object):
-    def __init__(self, rundir=tempf.mkdtemp(prefix='turns_')):
+    def __init__(self, nspec, rundir=tempf.mkdtemp(prefix='turns_')):
         self.executable_path = os.environ['OVERTURNS2D']
         self.inputfile_name = 'unsteady'
         self.logfile_name = 'stdout.log'
         self.rundir = rundir
+        self.nspec = nspec #initialize from input
         os.chdir(self.rundir)
         pass
 
@@ -100,32 +101,32 @@ class TurnsRKD(object):
 
 
     def get_grid_dimensions(self):
-        nj, nk = futils.get_grid_dimensions()
+        nj, nk = futils.get_grid_dimensions(self.nspec)
         return nj, nk
 
     def get_grid(self):
         nj, nk = self.get_grid_dimensions()
-        x, y = futils.read_grid(nj, nk)
+        x, y = futils.read_grid(nj, nk, self.nspec)
         return x, y
 
     def get_velocity(self):
         nj, nk = self.get_grid_dimensions()
-        x, y, u, v, uv = futils.read_reystress(nj, nk)
+        x, y, u, v, uv = futils.read_reystress(nj, nk, self.nspec)
         return u, v
 
     def get_reystress(self):
         nj, nk = self.get_grid_dimensions()
-        x, y, u, v, uv = futils.read_reystress(nj, nk)
+        x, y, u, v, uv = futils.read_reystress(nj, nk, self.nspec)
         return uv
 
     def get_production(self):
         nj, nk = self.get_grid_dimensions()
-        prod = futils.read_production(nj, nk)
+        prod = futils.read_production(nj, nk, self.nspec)
         return prod
     
     def get_destruction(self):
         nj, nk = self.get_grid_dimensions()
-        dest = futils.read_destruction(nj, nk)
+        dest = futils.read_destruction(nj, nk, self.nspec)
         return dest
 
     def get_cp(self):
@@ -151,7 +152,7 @@ class TurnsRKD(object):
 
     def read_beta(self, filename):
         tb = np.loadtxt(filename)
-        nj, nk = futils.get_grid_dimensions()
+        nj, nk = futils.get_grid_dimensions(self.nspec)
         beta = np.zeros([nj, nk])
         counter = 0
         for k in range(nk):
@@ -162,8 +163,8 @@ class TurnsRKD(object):
 
 
 class AdTurnsRKD(TurnsRKD):
-    def __init__(self, rundir=tempf.mkdtemp(prefix='turns_')):
-        TurnsRKD.__init__(self, rundir)
+    def __init__(self, nspec, rundir=tempf.mkdtemp(prefix='turns_')):
+        TurnsRKD.__init__(self, nspec, rundir)
         self.executable_path = os.environ['ADOVERTURNS2D']
 
     def print_startinfo(self):
@@ -186,25 +187,39 @@ class AdTurnsRKD(TurnsRKD):
 
     def get_saadjoint(self):
         nj, nk = self.get_grid_dimensions()
-        psi_sa = futils.read_saadjoint(nj, nk)
+        psi_sa = futils.read_saadjoint(nj, nk, self.nspec)
         return psi_sa
 
 class SensTurnsRKD(AdTurnsRKD):
-    def __init__(self, rundir):
-        AdTurnsRKD.__init__(self, rundir)
+    def __init__(self, nspec, rundir):
+        AdTurnsRKD.__init__(self, nspec, rundir)
                
 
     def get_beta_sensitivity(self):
         prod = self.get_production()
         psi_sa = self.get_saadjoint()
-        sens = -prod*psi_sa
+
+        #sens = -prod*psi_sa
+        senstmp = -prod*psi_sa
+        [nj,nk,nspec] = np.shape(senstmp)
+        sens=np.zeros([nj,nk])
+        for i in range(nspec):
+            sens += senstmp[:,:,i]
+
         print "Sum of sensitivity: ", sum(sum(sens))
         return sens
 
     def get_gamma_sensitivity(self):
         dest = self.get_destruction()
         psi_sa = self.get_saadjoint()
-        sens = -dest*psi_sa
+
+        #sens = -dest*psi_sa
+        senstmp = -dest*psi_sa
+        [nj,nk,nspec] = np.shape(senstmp)
+        sens=np.zeros([nj,nk])
+        for i in range(nspec):
+            sens += senstmp[:,:,i]
+
         print "Sum of sensitivity: ", sum(sum(sens))
         return sens
 
