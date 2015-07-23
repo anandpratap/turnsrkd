@@ -31,6 +31,7 @@ class Optima(object):
         self.maxstep = 1
         self.objf = 0.0
         self.sens_norm = 0.0
+        self.nspec = 1 #asitav
 
     def check_rundir(self):
         # check for folder named base_dir, inside the folder check for fort.1 bc.inp atleast
@@ -80,7 +81,7 @@ class Optima(object):
         shutil.copytree(self.base_dir, current_rundir)
 
         # create solver instance
-        turns = TurnsRKD(rundir = current_rundir)
+        turns = TurnsRKD(nspec=self.nspec, rundir = current_rundir )
         if self.DEBUG:
             turns.set_debug_params()
         else:
@@ -95,14 +96,26 @@ class Optima(object):
                 cmd = 'cp ' + os.path.join(current_rundir, f) +' '+ current_adjoint_rundir + '/.'
                 sp.call(cmd, shell=True)
 
-            adturns = AdTurnsRKD(rundir = current_adjoint_rundir)
+            #for TS
+            if(self.nspec > 1):
+                print "Copy all the *_TS* files"
+                cmd = 'cp ' + os.path.join(current_rundir, 'fort_TS*.[8,9]') +' '+ current_adjoint_rundir + '/.'
+                sp.call(cmd, shell=True)
+                cmd = 'cp ' + os.path.join(current_rundir, 'SA_TS*.dat') +' '+ current_adjoint_rundir + '/.'
+                sp.call(cmd, shell=True)
+                cmd = 'cp ' + os.path.join(current_rundir, 'production_TS*.dat') +' '+ current_adjoint_rundir + '/.'
+                sp.call(cmd, shell=True)
+                cmd = 'cp ' + os.path.join(current_rundir, 'destruction_TS*.dat') +' '+ current_adjoint_rundir + '/.'
+                sp.call(cmd, shell=True)
+
+            adturns = AdTurnsRKD(nspec=self.nspec, rundir = current_adjoint_rundir)
             if self.DEBUG:
                 adturns.set_debug_params()
             else:
                 adturns.set_input_params(self.adjoint_params)
             
             adturns.run()
-            sensturns = SensTurnsRKD(rundir = current_adjoint_rundir)
+            sensturns = SensTurnsRKD(nspec=self.nspec, rundir = current_adjoint_rundir)
             sens = sensturns.get_beta_sensitivity()
             beta = sensturns.read_beta("beta.opt")
             beta = self.update(beta, sens)
@@ -129,7 +142,7 @@ class Optima(object):
             F = np.zeros([npoints,1])
             for pidx, p in enumerate(points):
                 current_adjoint_rundir = os.path.join(current_rundir, "adjoint_%i"%p)
-                sensturns = SensTurnsRKD(rundir = current_adjoint_rundir)
+                sensturns = SensTurnsRKD(nspec=self.nspec, rundir = current_adjoint_rundir)
                 sens = sensturns.get_beta_sensitivity()
                 jac[pidx, :] = np.reshape(sens, [1, nt])
                 F[pidx] = np.loadtxt("fort.747")
@@ -243,7 +256,7 @@ if __name__ == "__main__":
 DEBUG = True
 def run_pointwise_adjoint((p, current_rundir, adjoint_params, debug)):
     current_adjoint_rundir = os.path.join(current_rundir, "adjoint_%i"%p)
-    adturns = AdTurnsRKD(rundir = current_adjoint_rundir)
+    adturns = AdTurnsRKD(nspec=self.nspec, rundir = current_adjoint_rundir)
     
     # setup obj.inp
     f = open("obj.inp", "w")
