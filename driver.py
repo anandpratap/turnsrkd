@@ -10,7 +10,7 @@ SUCCESS = 0
 
 
 class TurnsRKD(object):
-    def __init__(self, nspec, rundir=tempf.mkdtemp(prefix='turns_')):
+    def __init__(self, nspec=1, rundir=tempf.mkdtemp(prefix='turns_')):
         self.executable_path = os.environ['OVERTURNS2D']
         self.inputfile_name = 'unsteady'
         self.logfile_name = 'stdout.log'
@@ -163,7 +163,7 @@ class TurnsRKD(object):
 
 
 class AdTurnsRKD(TurnsRKD):
-    def __init__(self, nspec, rundir=tempf.mkdtemp(prefix='turns_')):
+    def __init__(self, nspec=1, rundir=tempf.mkdtemp(prefix='turns_')):
         TurnsRKD.__init__(self, nspec, rundir)
         self.executable_path = os.environ['ADOVERTURNS2D']
 
@@ -191,7 +191,7 @@ class AdTurnsRKD(TurnsRKD):
         return psi_sa
 
 class SensTurnsRKD(AdTurnsRKD):
-    def __init__(self, nspec, rundir):
+    def __init__(self, nspec=1, rundir):
         AdTurnsRKD.__init__(self, nspec, rundir)
                
 
