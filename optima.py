@@ -5,6 +5,7 @@ import subprocess as sp
 import numpy as np
 from numpy.linalg import norm
 import scipy.sparse.linalg as slinalg
+import scipy.io as io
 from multiprocessing import Pool
 from itertools import repeat, izip
 
@@ -12,7 +13,8 @@ from itertools import repeat, izip
 
 from driver import TurnsRKD, AdTurnsRKD, SensTurnsRKD
 from template import POINTWISE_OBJINP
-BASE_DIR_NFILES = 6
+from rbfutils import calc_rbf, calc_kernel
+BASE_DIR_NFILES = 8
 BASE_DIR_NAME = "base_dir"
 
 class Optima(object):
@@ -40,7 +42,7 @@ class Optima(object):
             raise ValueError("Base directory not found!!")
         base_files = glob.glob(os.path.join(self.base_dir, '*'))
         nbase_files = len(base_files)
-        if nbase_files != BASE_DIR_NFILES:
+        if nbase_files > BASE_DIR_NFILES:
             raise ValueError("Something wrong with the base directory, number of files do not match, change the value in optima if you think you are 100% right!!")
         for f in ['fort.1', 'bc.inp', 'obj.inp']:
             if not os.path.isfile(os.path.join(self.base_dir, f)):
@@ -64,13 +66,19 @@ class Optima(object):
             raise ValueError("Step type not defined!")
             
         return beta
+
+    def step_preprocess(self):
+        pass
+    def step_postprocess(self):
+        pass
             
     def step(self):
+        self.step_preprocess()
         # create iteration directory
         current_rundir = os.path.join(self.rundir, "iteration_%i"%self.iteration_number)
         # copy files from base_dir
         shutil.copytree(self.base_dir, current_rundir)
-        
+
         # create solver instance
         turns = TurnsRKD(rundir = current_rundir)
         if self.DEBUG:
@@ -157,6 +165,77 @@ class Optima(object):
             log.close()
             # write log file
             os.chdir(self.rundir)
+
+
+class RBFOptima(Optima):
+    def __init__(self, rundir):
+        Optima.__init__(self, rundir)
+        nodes = io.loadmat(os.path.join(self.base_dir, "rbf_nodes.mat"))
+        self.x_nodes = nodes["xr"]
+        self.y_nodes = nodes["yr"]
+        self.r_nodes = nodes["r"]
+    
+    def write_weights(self, filename):
+        np.savetxt(filename, self.w_nodes)
+        
+    def read_weights(self):
+        self.w_nodes = np.loadtxt("weights.dat")
+        return self.w_nodes
+
+    def step(self):
+        self.step_preprocess()
+        # create iteration directory
+        current_rundir = os.path.join(self.rundir, "iteration_%i"%self.iteration_number)
+        # copy files from base_dir
+        shutil.copytree(self.base_dir, current_rundir)
+
+        # create solver instance
+        turns = TurnsRKD(rundir = current_rundir)
+        if self.DEBUG:
+            turns.set_debug_params()
+        else:
+            turns.set_input_params(self.solver_params)
+            
+        x, y = turns.get_grid()
+        self.read_weights()
+        beta_rbf = calc_rbf(x, y, self.x_nodes, self.y_nodes, self.r_nodes, self.w_nodes)
+        turns.write_beta(beta_rbf, "beta.opt")
+        turns.run()
+ 
+        if self.step_type == 'sd':
+            current_adjoint_rundir = os.path.join(current_rundir, "adjoint_0")
+            os.mkdir(current_adjoint_rundir)
+            for f in self.adjoint_copytree:
+                cmd = 'cp ' + os.path.join(current_rundir, f) +' '+ current_adjoint_rundir + '/.'
+                sp.call(cmd, shell=True)
+
+            adturns = AdTurnsRKD(rundir = current_adjoint_rundir)
+            if self.DEBUG:
+                adturns.set_debug_params()
+            else:
+                adturns.set_input_params(self.adjoint_params)
+            
+            adturns.run()
+            sensturns = SensTurnsRKD(rundir = current_adjoint_rundir)
+            beta_sens = sensturns.get_beta_sensitivity()
+            weights_sens = np.zeros_like(self.w_nodes)
+            for w in range(len(self.w_nodes)):
+                dbeta_dw = calc_kernel(x, y, self.x_nodes[w], self.y_nodes[w], self.r_nodes[w])
+                weights_sens[w] = sum(sum(beta_sens*dbeta_dw))
+            stepsize = self.base_stepsize
+            self.w_nodes = self.w_nodes - weights_sens/abs(weights_sens).max()*stepsize
+        else:
+            raise ValueError("Step type not defined!")
+           
+        
+        self.write_weights(os.path.join(self.base_dir, "weights.dat"))
+        print "Updated beta in the base directory!!"
+        self.iteration_number += 1
+        try:
+            self.objf = np.loadtxt("fort.747")[-1]
+        except:
+            self.objf = np.loadtxt("fort.747")
+        self.sens_norm = norm(weights_sens)
 
 if __name__ == "__main__":
     pass
