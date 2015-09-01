@@ -32,6 +32,9 @@ class Optima(object):
         self.objf = 0.0
         self.sens_norm = 0.0
         self.nspec = 1 #asitav
+        self.reg = False
+        self.sigma_obs = 1e-5
+        self.sigma_prior = 1.0
 
     def check_rundir(self):
         # check for folder named base_dir, inside the folder check for fort.1 bc.inp atleast
@@ -118,7 +121,13 @@ class Optima(object):
             sensturns = SensTurnsRKD(nspec=self.nspec, rundir = current_adjoint_rundir)
             sens = sensturns.get_beta_sensitivity()
             beta = sensturns.read_beta("beta.opt")
+            if self.reg:
+                ni, nj = np.shape(sens)
+                for i in range(ni):
+                    for j in range(nj):
+                        sens[i,j] = 2.0*sens[i,j]/self.sigma_obs**2 + 2.0*(beta[i,j] - 1.0)/self.sigma_prior**2
             beta = self.update(beta, sens)
+            self.beta = beta
         elif self.step_type == 'gn':
             # Gauss Newton
             points = self.points
@@ -174,6 +183,9 @@ class Optima(object):
             print "Sensitivity Norm: ", self.sens_norm
             log = open(os.path.join(self.rundir,'optima.log'), 'ab+')
             log.write('%i %10.14f %10.14f'%(self.iteration_number, self.objf, self.sens_norm))
+            if self.reg:
+                log.write(' %16.16f'%(self.objf/self.sigma_obs**2 + sum(sum((self.beta-1.0)**2))/self.sigma_prior**2))
+
             log.write('\n')
             log.close()
             # write log file
