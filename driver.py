@@ -4,7 +4,9 @@ import os
 import re
 from utils import bcolors
 import numpy as np
+import scipy.io as io
 import fortutils as futils
+from rbfutils import calc_rbf, calc_kernel
 
 SUCCESS = 0
 
@@ -23,7 +25,7 @@ class TurnsRKD(object):
         self.debug = value
 
     def set_debug_params(self):
-        debug_params = {'NSTEPS': 2, 'NREST': 1, 'NPNORM': 1, 'DT': 0.2}
+        debug_params = {'NSTEPS': 20, 'NREST': 1, 'NPNORM': 1, 'DT': 0.2}
         self.set_input_params(debug_params)
 
     def set_input_params(self, params_dict):
@@ -107,6 +109,10 @@ class TurnsRKD(object):
     def get_grid(self):
         nj, nk = self.get_grid_dimensions()
         x, y = futils.read_grid(nj, nk, self.nspec)
+        if self.nspec == 1:
+            # for backward compatibility
+            x = np.reshape(x, [nj, nk])
+            y = np.reshape(y, [nj, nk])
         return x, y
 
     def get_velocity(self):
@@ -122,11 +128,15 @@ class TurnsRKD(object):
     def get_production(self):
         nj, nk = self.get_grid_dimensions()
         prod = futils.read_production(nj, nk, self.nspec)
+        if self.nspec == 1:
+            prod = np.reshape(prod, [nj, nk])
         return prod
     
     def get_destruction(self):
         nj, nk = self.get_grid_dimensions()
         dest = futils.read_destruction(nj, nk, self.nspec)
+        if self.nspec == 1:
+            dest = np.reshape(dest, [nj, nk])
         return dest
 
     def get_cp(self):
@@ -188,10 +198,12 @@ class AdTurnsRKD(TurnsRKD):
     def get_saadjoint(self):
         nj, nk = self.get_grid_dimensions()
         psi_sa = futils.read_saadjoint(nj, nk, self.nspec)
+        if self.nspec == 1:
+            psi_sa = np.reshape(psi_sa, [nj, nk])
         return psi_sa
 
 class SensTurnsRKD(AdTurnsRKD):
-    def __init__(self, nspec=1, rundir):
+    def __init__(self, nspec=1, rundir=tempf.mkdtemp(prefix='turns_')):
         AdTurnsRKD.__init__(self, nspec, rundir)
                
 
@@ -201,11 +213,16 @@ class SensTurnsRKD(AdTurnsRKD):
 
         #sens = -prod*psi_sa
         senstmp = -prod*psi_sa
-        [nj,nk,nspec] = np.shape(senstmp)
+        try:
+            [nj,nk,nspec] = np.shape(senstmp)
+        except:
+            [nj,nk] = np.shape(senstmp)
         sens=np.zeros([nj,nk])
-        for i in range(nspec):
-            sens += senstmp[:,:,i]
-
+        if self.nspec > 1:
+            for i in range(self.nspec):
+                sens += senstmp[:,:,i]
+        else:
+            sens = senstmp
         print "Sum of sensitivity: ", sum(sum(sens))
         return sens
 
@@ -215,14 +232,36 @@ class SensTurnsRKD(AdTurnsRKD):
 
         #sens = -dest*psi_sa
         senstmp = -dest*psi_sa
-        [nj,nk,nspec] = np.shape(senstmp)
-        sens=np.zeros([nj,nk])
-        for i in range(nspec):
-            sens += senstmp[:,:,i]
+        try:
+            [nj,nk,nspec] = np.shape(senstmp)
+        except:
+            [nj,nk] = np.shape(senstmp)
 
+        sens=np.zeros([nj,nk])
+        if self.nspec > 1:
+            for i in range(nspec):
+                sens += senstmp[:,:,i]
+        else:
+            sens = senstmp
+                        
         print "Sum of sensitivity: ", sum(sum(sens))
         return sens
+        
+    def get_wrbf_sensitivity(self):
+        x, y = self.get_grid()
+        nodes = io.loadmat("../rbf_nodes.mat")
+        x_nodes = nodes["xr"]
+        y_nodes = nodes["yr"]
+        r_nodes = nodes["r"]
+        w_nodes = np.loadtxt("../weights.dat")
+        beta_sens = self.get_beta_sensitivity()
 
+        weights_sens = np.zeros_like(w_nodes)
+        for w in range(len(w_nodes)):
+            dbeta_dw = calc_kernel(x, y, x_nodes[w], y_nodes[w], r_nodes[w])
+            weights_sens[w] = sum(sum(beta_sens*dbeta_dw))
+            
+        return weights_sens
 
 if __name__ == "__main__":
     # test using naca 4412 test case 
