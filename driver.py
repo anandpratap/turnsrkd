@@ -171,6 +171,16 @@ class TurnsRKD(object):
                 counter  = counter + 1
         return beta
 
+    def get_sarc(self):
+        ni, nj = futils.get_grid_dimensions(self.nspec)
+        sarc = futils.get_sarc(ni, nj)
+        return sarc
+
+    def get_delta(self):
+        beta = self.read_beta("beta.opt")
+        prod = self.get_production()
+        delta = (beta - 1)*prod
+        return delta
 
 class AdTurnsRKD(TurnsRKD):
     def __init__(self, nspec=1, rundir=tempf.mkdtemp(prefix='turns_')):

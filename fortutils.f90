@@ -166,3 +166,15 @@ subroutine read_destruction(nj,nk,nspec,prod)
     enddo
   endif
 end subroutine read_destruction
+subroutine get_sarc(ni,nj,sarc)
+  implicit none
+  integer, intent(in) :: ni, nj
+  real(kind=8), dimension(ni,nj), intent(out) :: sarc
+
+  integer :: i, j
+
+  open(unit=111, form='unformatted', file='sarc.dat')
+  read(111) i, j
+  read(111) ((sarc(i,j), i=1,ni), j=1,nj)
+  close(111)
+end subroutine get_sarc
