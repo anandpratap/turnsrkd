@@ -1,5 +1,4 @@
 import numpy as np
-from mpi4py import MPI
 from driver import TurnsRKD, AdTurnsRKD, SensTurnsRKD
 import subprocess as sp
 import os
@@ -10,7 +9,7 @@ PBS_STRING="""
 #PBS -S /bin/sh
 #PBS -N jac_%i
 #PBS -l nodes=1:ppn=1,pmem=2g
-#PBS -l walltime=2:00:00
+#PBS -l walltime=4:00:00
 #PBS -A kdur_fluxoe
 #PBS -l qos=flux
 #PBS -q fluxoe
@@ -72,7 +71,7 @@ class JacobianCalc(object):
             os.chdir(current_adjoint_rundir)
             os.system("qsub run.pbs")
             os.chdir(self.solution_dir)
-            time.sleep(0.1) 
+            time.sleep(0.05) 
             print "\r Submitting pbs job for point %i"%point,
         print "\n"
 
@@ -88,9 +87,12 @@ class JacobianCalc(object):
             print "\r Creating jacobian for point %i"%point,
             current_adjoint_rundir = os.path.join(self.solution_dir, "jac_adjoint_%i"%point)
             sensturns = SensTurnsRKD(nspec=1, rundir = current_adjoint_rundir)
-            sens = sensturns.get_beta_sensitivity()
-            jac_map[idx, :] = np.reshape(sens, [1, nt])
-            F_map[idx] = np.loadtxt('fort.747')
+            try:
+                sens = sensturns.get_beta_sensitivity()
+                jac_map[idx, :] = np.reshape(sens, [1, nt])
+                F_map[idx] = np.loadtxt('fort.747')
+            except:
+                print "NOT FOUND SENS"
         print "\n"
         beta_map = np.reshape(sensturns.read_beta("beta.opt"), [nt, 1])
         io.savemat(os.path.join(self.solution_dir, "map.mat"),  {'jac_map':jac_map, 'beta_map':beta_map, 'F_map': F_map, 'nj':nj, 'nk':nk})
