@@ -21,7 +21,7 @@ fprintf('completed!\n')
 
 % Cholesky
 fprintf('Calculating cholesky......')
-eps_ = 1e-7;
+eps_ = 1e-16;
 H = chol(H + eps_.*speye(m))';
 fprintf('completed!\n')
 
